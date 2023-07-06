@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	//ErrNilListener 为没有找到listener的错误
+	// ErrNilListener 为没有找到listener的错误
 	ErrNilListener = errors.New("nil listener")
 )
 
@@ -46,7 +46,7 @@ type Listener interface {
 	Event(event *Event)
 }
 
-//Dispatcher is the observer
+// Dispatcher is the observer
 type Dispatcher struct {
 	listeners map[string][]Listener
 }
@@ -123,7 +123,7 @@ func (d *Dispatcher) UnRegisterListener(listenerObj Listener, keys ...string) er
 	return nil
 }
 
-//OnChange 实现Apollo的ChangeEvent处理
+// OnChange 实现Apollo的ChangeEvent处理
 func (d *Dispatcher) OnChange(changeEvent *ChangeEvent) {
 	if changeEvent == nil {
 		return
@@ -147,7 +147,7 @@ func (d *Dispatcher) dispatchEvent(eventKey string, event *ConfigChange) {
 		}
 		if matched {
 			for _, listener := range listenerList {
-				log.Logger.Info("event generated for %s key %s", regKey, eventKey)
+				log.Logger.Infof("event generated for %s key %s", regKey, eventKey)
 				go listener.Event(convertToEvent(eventKey, event))
 			}
 		}
