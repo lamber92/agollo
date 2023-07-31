@@ -90,10 +90,7 @@ func (d *Dispatcher) RegisterListener(listenerObject Listener, keys ...string) e
 
 func invalidKey(key string) bool {
 	_, err := regexp.Compile(key)
-	if err != nil {
-		return true
-	}
-	return false
+	return err != nil
 }
 
 // UnRegisterListener 用于为某些key注释Listener
@@ -142,7 +139,7 @@ func (d *Dispatcher) dispatchEvent(eventKey string, event *ConfigChange) {
 	for regKey, listenerList := range d.listeners {
 		matched, err := regexp.MatchString(regKey, eventKey)
 		if err != nil {
-			log.Logger.Errorf("regular expression for key %s error %s", eventKey, err)
+			log.Logger.Errorf("regular expression for key %s, error: %v", eventKey, err)
 			continue
 		}
 		if matched {

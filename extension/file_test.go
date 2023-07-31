@@ -22,7 +22,6 @@ import (
 
 	"github.com/apolloconfig/agollo/v4/env/config"
 
-	"github.com/apolloconfig/agollo/v4/env/file"
 	. "github.com/tevid/gohamcrest"
 )
 
@@ -48,6 +47,5 @@ func TestSetFileHandler(t *testing.T) {
 
 	fileHandler := GetFileHandler()
 
-	b := fileHandler.(file.FileHandler)
-	Assert(t, b, NotNilVal())
+	Assert(t, fileHandler, NotNilVal())
 }

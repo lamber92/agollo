@@ -54,14 +54,11 @@ func (c *Cache) GetConfig(namespace string) *Config {
 	if namespace == "" {
 		return nil
 	}
-
-	config, ok := c.apolloConfigCache.Load(namespace)
-
+	conf, ok := c.apolloConfigCache.Load(namespace)
 	if !ok {
 		return nil
 	}
-
-	return config.(*Config)
+	return conf.(*Config)
 }
 
 // CreateNamespaceConfig 根据namespace初始化agollo内容配置
@@ -125,13 +122,13 @@ func (c *Config) getConfigValue(key string, waitInit bool) interface{} {
 		c.waitInit.Wait()
 	}
 	if c.cache == nil {
-		log.Errorf("get config value fail!namespace:%s is not exist!", c.namespace)
+		log.Errorf("get config value fail! namespace:%s not exist!", c.namespace)
 		return nil
 	}
 
 	value, err := c.cache.Get(key)
 	if err != nil {
-		log.Errorf("get config value fail!key:%s,err:%s", key, err)
+		log.Errorf("get config value fail! key:%s, error:%v", key, err)
 		return nil
 	}
 
@@ -228,8 +225,7 @@ func (c *Config) GetIntValueImmediately(key string, defaultValue int) int {
 
 	v, err := strconv.Atoi(s)
 	if err != nil {
-		// TODO: 此处输出日志等级待优化，下同
-		log.Debugf("Atoi failed. err:%s", err.Error())
+		log.Debugf("Atoi failed. err: %s", err.Error())
 		return defaultValue
 	}
 
@@ -256,7 +252,7 @@ func (c *Config) GetFloatValueImmediately(key string, defaultValue float64) floa
 
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		log.Debugf("ParseFloat failed. err:%s", err.Error())
+		log.Debugf("ParseFloat failed. err: %s", err.Error())
 		return defaultValue
 	}
 
@@ -283,7 +279,7 @@ func (c *Config) GetBoolValueImmediately(key string, defaultValue bool) bool {
 
 	v, err := strconv.ParseBool(s)
 	if err != nil {
-		log.Debugf("ParseBool failed. err:%s", err.Error())
+		log.Debugf("ParseBool failed. err: %s", err.Error())
 		return defaultValue
 	}
 
@@ -395,7 +391,7 @@ func (c *Config) GetIntValue(key string, defaultValue int) int {
 
 	v, err := strconv.Atoi(s)
 	if err != nil {
-		log.Debugf("Atoi failed. err:%s", err.Error())
+		log.Debugf("Atoi failed. err: %s", err.Error())
 		return defaultValue
 	}
 	return v
@@ -421,7 +417,7 @@ func (c *Config) GetFloatValue(key string, defaultValue float64) float64 {
 
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		log.Debugf("ParseFloat failed. err:%s", err.Error())
+		log.Debugf("ParseFloat failed. err: %s", err.Error())
 		return defaultValue
 	}
 	return v
@@ -457,7 +453,7 @@ func (c *Config) GetBoolValue(key string, defaultValue bool) bool {
 // 并判断是否需要写备份文件
 func (c *Cache) UpdateApolloConfig(apolloConfig *config.ApolloConfig, appConfigFunc func() config.AppConfig) {
 	if apolloConfig == nil {
-		log.Error("apolloConfig is null,can't update!")
+		log.Error("apolloConfig is null, can't update!")
 		return
 	}
 
@@ -509,7 +505,7 @@ func (c *Cache) UpdateApolloConfigCache(configurations map[string]interface{}, e
 		c.waitInit.Done()
 	}(config)
 
-	if (configurations == nil || len(configurations) == 0) && config.cache.EntryCount() == 0 {
+	if (len(configurations) == 0) && config.cache.EntryCount() == 0 {
 		return nil
 	}
 
@@ -522,27 +518,26 @@ func (c *Cache) UpdateApolloConfigCache(configurations map[string]interface{}, e
 
 	changes := make(map[string]*ConfigChange)
 
-	if configurations != nil {
-		// update new
-		// keys
-		for key, value := range configurations {
-			// key state insert or update
-			// insert
-			if !mp[key] {
-				changes[key] = createAddConfigChange(value)
-			} else {
-				// update
-				oldValue, _ := config.cache.Get(key)
-				if !reflect.DeepEqual(oldValue, value) {
-					changes[key] = createModifyConfigChange(oldValue, value)
-				}
+	// update new
+	// keys
+	for key, value := range configurations {
+		// key state insert or update
+		// insert
+		if !mp[key] {
+			changes[key] = createAddConfigChange(value)
+		} else {
+			// update
+			oldValue, _ := config.cache.Get(key)
+			if !reflect.DeepEqual(oldValue, value) {
+				changes[key] = createModifyConfigChange(oldValue, value)
 			}
-
-			if err := config.cache.Set(key, value, expireTime); err != nil {
-				log.Errorf("set key %s to cache error %s", key, err)
-			}
-			delete(mp, key)
 		}
+
+		if err := config.cache.Set(key, value, expireTime); err != nil {
+			log.Errorf("set key %s to cache, error: %v", key, err)
+		}
+
+		delete(mp, key)
 	}
 
 	// remove del keys

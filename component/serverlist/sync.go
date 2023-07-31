@@ -19,6 +19,7 @@ package serverlist
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -111,7 +112,7 @@ func SyncServerIPList(appConfigFunc func() config.AppConfig) (map[string]*config
 		AppConfigFunc:   appConfigFunc,
 	})
 	if err != nil {
-		if err == perror.ErrOverMaxRetryStill {
+		if errors.Is(err, perror.ErrOverMaxRetryStill) {
 			return nil, fmt.Errorf("获取Apollo服务列表失败")
 		}
 		return nil, err
@@ -127,10 +128,12 @@ func SyncServerIPListSuccessCallBack(responseBody []byte, callback http.CallBack
 	log.Debugf("get all server info: %s", string(responseBody))
 
 	tmpServerInfo := make([]*config.ServerInfo, 0)
+
 	if err = json.Unmarshal(responseBody, &tmpServerInfo); err != nil {
 		log.Errorf("unmarshal json failed. err: %v", err)
 		return
 	}
+
 	if len(tmpServerInfo) == 0 {
 		log.Info("get no real server!")
 		return

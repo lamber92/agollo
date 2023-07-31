@@ -99,7 +99,7 @@ func SetDownNode(configService string, serverHost string) {
 
 	for k, server := range s.serverMap {
 		// if some node has down then select next node
-		if strings.Index(k, serverHost) > -1 {
+		if strings.Contains(k, serverHost) {
 			server.IsDown = true
 		}
 	}

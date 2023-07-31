@@ -44,11 +44,12 @@ func (a *AbsApolloConfig) SyncWithNamespace(namespace string, appConfigFunc func
 		AppID:   appConfig.AppID,
 		Secret:  appConfig.Secret,
 		Timeout: notifyConnectTimeout,
+		IsRetry: true,
 	}
 	if appConfig.SyncServerTimeout > 0 {
 		duration, err := time.ParseDuration(strconv.Itoa(appConfig.SyncServerTimeout) + "s")
 		if err != nil {
-			log.Errorf("parse sync server timeout %s fail, error:%v", err)
+			log.Errorf("parse sync server timeout %s fail, error:%v", appConfig.SyncServerTimeout, err)
 			return nil
 		}
 		c.Timeout = duration

@@ -19,6 +19,7 @@ Agollo - Go Client for Apollo
 
 * 首次连接Apollo服务时检查IP地址、App秘钥合法性，并同步返回连接失败原因
 * 修改Log接口定义，使之与其他开源库Log库更加贴合
+* 修复请求重试后有可能内存泄露的问题
 
 # Features
 
