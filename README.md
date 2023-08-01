@@ -15,11 +15,17 @@ Agollo - Go Client for Apollo
 
 # Changes
 
-基于原版代码，作出以下修改项： 
+基于原版代码(代码同步到原库v4.3.1)，有以下修改项： 
 
-* 首次连接Apollo服务时检查IP地址、App秘钥合法性，并同步返回连接失败原因
-* 修改Log接口定义，使之与其他开源库Log库更加贴合
-* 修复请求重试后有可能内存泄露的问题
+* 首次连接Apollo服务时检查IP地址、App秘钥合法性，并同步返回连接失败原因；
+* 修改Log接口定义，使之与其他开源库Log库更加贴合；
+* 修复请求失败后，因为触发重试机制导致body没有释放而可能导致内存泄露的问题；
+* 支持动态新增指定namespace配置缓存，并自动监听对应namespace配置变动；
+  * 改写 GetConfigAndInit() 方法
+  * 改写 notify 包逻辑
+* 优化针对请求 notifications/v2/ 接口因为系统架构中存在中间网络组件导致返回http-status-code=401时的处理方式（[#3652](https://github.com/apolloconfig/apollo/issues/3652)）；
+* 增加3个常用错误，方便业务层面处理；
+* 修改部分变量名称及注释，使之更贴合实际意义；
 
 # Features
 

@@ -18,6 +18,7 @@
 package remote
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -68,11 +69,17 @@ func (*asyncApolloConfig) GetSyncURI(config config.AppConfig, namespaceName stri
 		url.QueryEscape(config.Label))
 }
 
-func (a *asyncApolloConfig) Sync(appConfigFunc func() config.AppConfig) []*config.ApolloConfig {
-	appConfig := appConfigFunc()
-	remoteConfigs, err := a.notifyRemoteConfig(appConfigFunc, utils.Empty)
-
-	var apolloConfigs []*config.ApolloConfig
+// Sync synchronize remote config asynchronously
+// it should be noted that a blocking request is used here,
+// and the apollo service side will suspend the request,
+// and return the result immediately when the period changes,
+// otherwise it needs to wait for the request to time out or be interrupted by 'ctx'.
+func (a *asyncApolloConfig) Sync(ctx context.Context, appConfigFunc func() config.AppConfig) []*config.ApolloConfig {
+	var (
+		appConfig     = appConfigFunc()
+		apolloConfigs []*config.ApolloConfig
+	)
+	remoteConfigs, err := a.notifyRemoteConfig(ctx, appConfigFunc, utils.Empty)
 	if err != nil {
 		apolloConfigs = loadBackupConfig(appConfig.NamespaceName, appConfig)
 	}
@@ -82,7 +89,7 @@ func (a *asyncApolloConfig) Sync(appConfigFunc func() config.AppConfig) []*confi
 	}
 	// 只是拉去有变化的配置, 并更新拉取成功的namespace的notify ID
 	for _, notifyConfig := range remoteConfigs {
-		apolloConfig := a.SyncWithNamespace(notifyConfig.NamespaceName, appConfigFunc)
+		apolloConfig := a.SyncWithNamespace(ctx, notifyConfig.NamespaceName, appConfigFunc)
 		if apolloConfig != nil {
 			appConfig.GetNotificationsMap().UpdateNotify(notifyConfig.NamespaceName, notifyConfig.NotificationID)
 			apolloConfigs = append(apolloConfigs, apolloConfig)
@@ -99,7 +106,7 @@ func (*asyncApolloConfig) CallBack(namespace string) http.CallBack {
 	}
 }
 
-func (a *asyncApolloConfig) notifyRemoteConfig(appConfigFunc func() config.AppConfig, namespace string) ([]*config.Notification, error) {
+func (a *asyncApolloConfig) notifyRemoteConfig(ctx context.Context, appConfigFunc func() config.AppConfig, namespace string) ([]*config.Notification, error) {
 	if appConfigFunc == nil {
 		panic("can not find apollo config!please confirm!")
 	}
@@ -113,15 +120,14 @@ func (a *asyncApolloConfig) notifyRemoteConfig(appConfigFunc func() config.AppCo
 		Secret: appConfig.Secret,
 	}
 	connectConfig.Timeout = notifyConnectTimeout
-	notifies, err := http.RequestRecovery(appConfig, connectConfig, &http.CallBack{
+	notifies, err := http.RequestRecovery(ctx, appConfig, connectConfig, &http.CallBack{
 		SuccessCallBack: func(responseBody []byte, callback http.CallBack) (interface{}, error) {
 			return toApolloConfig(responseBody)
 		},
 		NotModifyCallBack: touchApolloConfigCache,
 		Namespace:         namespace,
 	})
-
-	if notifies == nil {
+	if notifies == nil || err != nil {
 		return nil, err
 	}
 

@@ -21,11 +21,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/apolloconfig/agollo/v4/env/config"
 	"os"
 	"sync"
 
 	"github.com/apolloconfig/agollo/v4/component/log"
+	"github.com/apolloconfig/agollo/v4/env/config"
 	jsonConfig "github.com/apolloconfig/agollo/v4/env/config/json"
 )
 
@@ -98,7 +98,7 @@ func (fileHandler *FileHandler) GetConfigFile(configDir string, appID string, na
 // LoadConfigFile load config from file
 func (fileHandler *FileHandler) LoadConfigFile(configDir string, appID string, namespace string) (*config.ApolloConfig, error) {
 	configFilePath := fileHandler.GetConfigFile(configDir, appID, namespace)
-	log.Infof("load config file from: %s", configFilePath)
+	log.Debugf("load config file from: %s", configFilePath)
 	c, e := jsonFileConfig.Load(configFilePath, func(b []byte) (interface{}, error) {
 		config := &config.ApolloConfig{}
 		e := json.NewDecoder(bytes.NewBuffer(b)).Decode(config)

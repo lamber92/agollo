@@ -18,6 +18,7 @@
 package remote
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -197,7 +198,7 @@ func TestApolloConfig_Sync(t *testing.T) {
 	server := initMockNotifyAndConfigServer()
 	appConfig := initNotifications()
 	appConfig.IP = server.URL
-	apolloConfigs := asyncApollo.Sync(func() config.AppConfig {
+	apolloConfigs := asyncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *appConfig
 	})
 	// err keep nil
@@ -211,7 +212,7 @@ func TestApolloConfig_SyncTwoOk(t *testing.T) {
 	server := initMockNotifyAndConfigServerWithTwo()
 	appConfig := initNotifications()
 	appConfig.IP = server.URL
-	apolloConfigs := asyncApollo.Sync(func() config.AppConfig {
+	apolloConfigs := asyncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *appConfig
 	})
 	// err keep nil
@@ -226,7 +227,7 @@ func TestApolloConfig_GraySync(t *testing.T) {
 	appConfig := initNotifications()
 	appConfig.IP = server.URL
 	appConfig.Label = grayLabel
-	apolloConfigs := asyncApollo.Sync(func() config.AppConfig {
+	apolloConfigs := asyncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *appConfig
 	})
 	// err keep nil
@@ -242,7 +243,7 @@ func TestApolloConfig_SyncABC1Error(t *testing.T) {
 	server := initMockNotifyAndConfigServerWithTwoErrResponse()
 	appConfig := initNotifications()
 	appConfig.IP = server.URL
-	apolloConfigs := asyncApollo.Sync(func() config.AppConfig {
+	apolloConfigs := asyncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *appConfig
 	})
 	// err keep nil
@@ -268,7 +269,7 @@ func TestGetRemoteConfig(t *testing.T) {
 	var err error
 	appConfig := initNotifications()
 	appConfig.IP = server.URL
-	remoteConfigs, err = asyncApollo.notifyRemoteConfig(func() config.AppConfig {
+	remoteConfigs, err = asyncApollo.notifyRemoteConfig(context.Background(), func() config.AppConfig {
 		return *appConfig
 	}, EMPTY)
 
@@ -299,7 +300,7 @@ func TestErrorGetRemoteConfig(t *testing.T) {
 	var remoteConfigs []*config.Notification
 	var err error
 
-	remoteConfigs, err = asyncApollo.notifyRemoteConfig(func() config.AppConfig {
+	remoteConfigs, err = asyncApollo.notifyRemoteConfig(context.Background(), func() config.AppConfig {
 		return *appConfig
 	}, EMPTY)
 

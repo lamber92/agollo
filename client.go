@@ -19,6 +19,7 @@ package agollo
 
 import (
 	"container/list"
+	"context"
 	"errors"
 
 	"github.com/apolloconfig/agollo/v4/agcache"
@@ -86,7 +87,7 @@ type internalClient struct {
 	initAppConfigFunc func() (*config.AppConfig, error)
 	appConfig         *config.AppConfig
 	cache             *storage.Cache
-	configComponent   *notify.ConfigComponent
+	changeMonitor     notify.ChangeMonitor
 }
 
 func (c *internalClient) getAppConfig() config.AppConfig {
@@ -126,7 +127,7 @@ func StartWithConfig(loadAppConfig func() (*config.AppConfig, error)) (Client, e
 	}
 
 	// first sync
-	configs := syncApolloConfig.Sync(client.getAppConfig)
+	configs := syncApolloConfig.Sync(context.Background(), client.getAppConfig)
 	if len(configs) == 0 && appConfig != nil && appConfig.MustStart {
 		return nil, errors.New("start failed cause no config was read")
 	}
@@ -137,14 +138,12 @@ func StartWithConfig(loadAppConfig func() (*config.AppConfig, error)) (Client, e
 
 	log.Debug("init notifySyncConfigServices finished")
 
-	// start long poll sync config
-	configComponent := &notify.ConfigComponent{}
-	configComponent.SetAppConfig(client.getAppConfig)
-	configComponent.SetCache(client.cache)
-	go component.StartRefreshConfig(configComponent)
-	client.configComponent = configComponent
+	// start long poll to sync config
+	monitor := notify.NewChangeMonitor(client.getAppConfig, client.cache)
+	client.changeMonitor = monitor
+	go component.StartRefreshConfig(monitor)
 
-	log.Info("start finished !")
+	log.Info("apollo-client start finished !")
 
 	return client, nil
 }
@@ -159,37 +158,38 @@ func (c *internalClient) GetConfigAndInit(namespace string) *storage.Config {
 	if namespace == "" {
 		return nil
 	}
-
-	config := c.cache.GetConfig(namespace)
-
-	if config == nil {
-		// init cache
-		storage.CreateNamespaceConfig(namespace)
-
+	conf := c.cache.GetConfig(namespace)
+	if conf == nil {
 		// sync config
-		syncApolloConfig.SyncWithNamespace(namespace, c.getAppConfig)
+		apolloConfig := syncApolloConfig.SyncWithNamespace(context.Background(), namespace, c.getAppConfig)
+		if apolloConfig != nil {
+			// trigger restart long polling, used to monitor changes in new namespaces
+			c.appConfig.GetNotificationsMap().AddNamespace(apolloConfig.NamespaceName)
+			c.changeMonitor.Stop()
+			go c.changeMonitor.Start()
+			// refresh cache and refresh long polling
+			c.cache.UpdateApolloConfig(apolloConfig, c.getAppConfig)
+			// fetch config from cache again
+			conf = c.cache.GetConfig(namespace)
+		}
 	}
-
-	config = c.cache.GetConfig(namespace)
-
-	return config
+	return conf
 }
 
 // GetConfigCache 根据namespace获取apollo配置的缓存
 func (c *internalClient) GetConfigCache(namespace string) agcache.CacheInterface {
-	config := c.GetConfigAndInit(namespace)
-	if config == nil {
+	conf := c.GetConfigAndInit(namespace)
+	if conf == nil {
 		return nil
 	}
-
-	return config.GetCache()
+	return conf.GetCache()
 }
 
 // GetDefaultConfigCache 获取默认缓存
 func (c *internalClient) GetDefaultConfigCache() agcache.CacheInterface {
-	config := c.GetConfigAndInit(storage.GetDefaultNamespace())
-	if config != nil {
-		return config.GetCache()
+	conf := c.GetConfigAndInit(storage.GetDefaultNamespace())
+	if conf != nil {
+		return conf.GetCache()
 	}
 	return nil
 }
@@ -271,5 +271,5 @@ func (c *internalClient) UseEventDispatch() {
 
 // Close 停止轮询
 func (c *internalClient) Close() {
-	c.configComponent.Stop()
+	c.changeMonitor.Stop()
 }

@@ -18,6 +18,7 @@
 package remote
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -99,11 +100,11 @@ func processJSONFiles(b []byte, callback http.CallBack) (o interface{}, err erro
 	return apolloConfig, nil
 }
 
-func (a *syncApolloConfig) Sync(appConfigFunc func() config.AppConfig) []*config.ApolloConfig {
+func (a *syncApolloConfig) Sync(ctx context.Context, appConfigFunc func() config.AppConfig) []*config.ApolloConfig {
 	appConfig := appConfigFunc()
 	configs := make([]*config.ApolloConfig, 0, 8)
 	config.SplitNamespaces(appConfig.NamespaceName, func(namespace string) {
-		apolloConfig := a.SyncWithNamespace(namespace, appConfigFunc)
+		apolloConfig := a.SyncWithNamespace(ctx, namespace, appConfigFunc)
 		if apolloConfig != nil {
 			configs = append(configs, apolloConfig)
 			return

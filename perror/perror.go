@@ -3,6 +3,7 @@ package perror
 import "fmt"
 
 var (
-	ErrOverMaxRetryStill = fmt.Errorf("Over Max Retry Still Error")
+	ErrOverMaxRetryTimes = fmt.Errorf("Over max retry times still error")
 	ErrUnauthorized      = fmt.Errorf("Unauthorized")
+	ErrNotFound          = fmt.Errorf("Not Found")
 )

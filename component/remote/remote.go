@@ -18,6 +18,8 @@
 package remote
 
 import (
+	"context"
+
 	"github.com/apolloconfig/agollo/v4/env/config"
 	"github.com/apolloconfig/agollo/v4/protocol/http"
 )
@@ -29,9 +31,9 @@ type ApolloConfig interface {
 	// GetSyncURI 获取同步路径
 	GetSyncURI(config config.AppConfig, namespaceName string) string
 	// Sync 同步获取 Apollo 配置
-	Sync(appConfigFunc func() config.AppConfig) []*config.ApolloConfig
+	Sync(ctx context.Context, appConfigFunc func() config.AppConfig) []*config.ApolloConfig
 	// CallBack 根据 namespace 获取 callback 方法
 	CallBack(namespace string) http.CallBack
 	// SyncWithNamespace 通过 namespace 同步 apollo 配置
-	SyncWithNamespace(namespace string, appConfigFunc func() config.AppConfig) *config.ApolloConfig
+	SyncWithNamespace(ctx context.Context, namespace string, appConfigFunc func() config.AppConfig) *config.ApolloConfig
 }

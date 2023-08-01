@@ -18,6 +18,7 @@
 package http
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -88,7 +89,11 @@ type CallBack struct {
 }
 
 // Request 建立网络请求
-func Request(requestURL string, connectionConfig *env.ConnectConfig, callBack *CallBack) (interface{}, error) {
+func Request(ctx context.Context,
+	requestURL string,
+	connectionConfig *env.ConnectConfig,
+	callBack *CallBack) (interface{}, error) {
+
 	client := &http.Client{}
 	// 如有设置自定义超时时间即使用
 	if connectionConfig != nil && connectionConfig.Timeout != 0 {
@@ -99,8 +104,7 @@ func Request(requestURL string, connectionConfig *env.ConnectConfig, callBack *C
 	var err error
 	url, err := url2.Parse(requestURL)
 	if err != nil {
-		log.Errorf("request Apollo Server url: %s, is invalid: %v", requestURL, err)
-		return nil, err
+		return nil, fmt.Errorf("invalid request URL: %s, err: %v", requestURL, err)
 	}
 	var insecureSkipVerify bool
 	if strings.HasPrefix(url.Scheme, "https") {
@@ -119,11 +123,10 @@ func Request(requestURL string, connectionConfig *env.ConnectConfig, callBack *C
 		}
 
 		var req *http.Request
-		req, err = http.NewRequest("GET", requestURL, nil)
+		req, err = http.NewRequestWithContext(ctx, "GET", requestURL, nil)
 		if req == nil || err != nil {
-			log.Errorf("Generate connect Apollo request Fail, url: %s, err: %s", requestURL, err)
 			// if error then sleep
-			return nil, errors.New("generate connect Apollo request fail")
+			return nil, fmt.Errorf("generate request failed. url: %s, err: %s", requestURL, err)
 		}
 
 		// 增加header选项
@@ -146,9 +149,8 @@ func Request(requestURL string, connectionConfig *env.ConnectConfig, callBack *C
 			if res != nil {
 				defer res.Body.Close()
 			}
-
 			if res == nil || err != nil {
-				log.Errorf("Connect Apollo Server Fail, url: %s, err: %s", requestURL, err)
+				log.Warnf("request failed. url: %s, err: %s", requestURL, err)
 				// if error then sleep
 				time.Sleep(onErrorRetryInterval)
 				return nil, continueErr
@@ -159,26 +161,43 @@ func Request(requestURL string, connectionConfig *env.ConnectConfig, callBack *C
 			case http.StatusOK:
 				responseBody, err := io.ReadAll(res.Body)
 				if err != nil {
-					log.Errorf("Connect Apollo Server Fail, url: %s, err: %v", requestURL, err)
+					log.Errorf("parse response body failed. try again. url: %s, err: %v", requestURL, err)
 					// if error then sleep
 					time.Sleep(onErrorRetryInterval)
 					return nil, continueErr
 				}
-
 				if callBack != nil && callBack.SuccessCallBack != nil {
 					return callBack.SuccessCallBack(responseBody, *callBack)
 				}
 				return nil, nil
 			case http.StatusNotModified:
-				log.Debugf("Config Not Modified, error: %v", err)
+				log.Debugf("config not modified, err: %v", err)
 				if callBack != nil && callBack.NotModifyCallBack != nil {
 					return nil, callBack.NotModifyCallBack()
 				}
 				return nil, nil
 			case http.StatusUnauthorized:
+				// https://github.com/apolloconfig/apollo/issues/3652
+				// During the long polling process, if the client is not directly connected to ApolloService
+				// and passes through a gateway in the middle, it is likely to return http-status-code: 401.
+				// Because the request timeout time set by the gateway is shorter than the suspension time
+				// of apollo Notifications-API, the request is disconnected on the gateway side and retried.
+				// At this time, the request time has been refreshed and does not match the signature of the
+				// original request, which eventually causes apolloService to return 401.
+				// Although this is not an elegant way, it is safest to handle it here for the time being.
+				if strings.Contains(requestURL, "notifications/v2") {
+					log.Debugf("config not modified, err: %v", err)
+					if callBack != nil && callBack.NotModifyCallBack != nil {
+						return nil, callBack.NotModifyCallBack()
+					}
+					return nil, nil
+				}
+				time.Sleep(onErrorRetryInterval)
 				return nil, perror.ErrUnauthorized
+			case http.StatusNotFound:
+				return nil, perror.ErrNotFound
 			default:
-				log.Errorf("Connect Apollo Server Fail, url: %s, StatusCode: %d", requestURL, res.StatusCode)
+				log.Debugf("response return err. url: %s, http-status-code: %d", requestURL, res.StatusCode)
 				// if error then sleep
 				time.Sleep(onErrorRetryInterval)
 				return nil, continueErr
@@ -195,20 +214,18 @@ func Request(requestURL string, connectionConfig *env.ConnectConfig, callBack *C
 		return result, err
 	}
 
-	log.Warnf("Over Max Retry Still Error. err: %v", err)
+	log.Warnf("over max retry times still error. err: %v", err)
 	if retry > retries {
-		err = perror.ErrOverMaxRetryStill
+		err = perror.ErrOverMaxRetryTimes
 	}
 	return nil, err
 }
 
 // RequestRecovery 可以恢复的请求
-func RequestRecovery(appConfig config.AppConfig,
+func RequestRecovery(ctx context.Context,
+	appConfig config.AppConfig,
 	connectConfig *env.ConnectConfig,
-	callBack *CallBack) (interface{}, error) {
-	format := "%s%s"
-	var err error
-	var response interface{}
+	callBack *CallBack) (response interface{}, err error) {
 
 	for {
 		host := loadBalance(appConfig)
@@ -216,12 +233,17 @@ func RequestRecovery(appConfig config.AppConfig,
 			return nil, err
 		}
 
-		requestURL := fmt.Sprintf(format, host, connectConfig.URI)
-		response, err = Request(requestURL, connectConfig, callBack)
+		requestURL := fmt.Sprintf("%s%s", host, connectConfig.URI)
+		response, err = Request(ctx, requestURL, connectConfig, callBack)
 		if err == nil {
 			return response, nil
 		}
 
+		if errors.Is(err, perror.ErrUnauthorized) ||
+			errors.Is(err, perror.ErrOverMaxRetryTimes) ||
+			errors.Is(err, perror.ErrNotFound) {
+			return nil, err
+		}
 		server.SetDownNode(appConfig.GetHost(), host)
 	}
 }
@@ -234,6 +256,12 @@ func loadBalance(appConfig config.AppConfig) string {
 	if serverInfo == nil {
 		return utils.Empty
 	}
+	return checkUrlSuffix(serverInfo.HomepageURL)
+}
 
-	return serverInfo.HomepageURL
+func checkUrlSuffix(url string) string {
+	if !strings.HasSuffix(url, "/") {
+		return url + "/"
+	}
+	return url
 }
