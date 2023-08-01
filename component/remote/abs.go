@@ -18,6 +18,7 @@
 package remote
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -32,7 +33,7 @@ type AbsApolloConfig struct {
 	remoteApollo ApolloConfig
 }
 
-func (a *AbsApolloConfig) SyncWithNamespace(namespace string, appConfigFunc func() config.AppConfig) *config.ApolloConfig {
+func (a *AbsApolloConfig) SyncWithNamespace(ctx context.Context, namespace string, appConfigFunc func() config.AppConfig) *config.ApolloConfig {
 	if appConfigFunc == nil {
 		panic("can not find apollo config!please confirm!")
 	}
@@ -56,9 +57,9 @@ func (a *AbsApolloConfig) SyncWithNamespace(namespace string, appConfigFunc func
 	}
 
 	callback := a.remoteApollo.CallBack(namespace)
-	apolloConfig, err := http.RequestRecovery(appConfig, c, &callback)
+	apolloConfig, err := http.RequestRecovery(ctx, appConfig, c, &callback)
 	if err != nil {
-		log.Errorf("request %s fail, error:%v", urlSuffix, err)
+		log.Errorf("request %s fail, error: %v", urlSuffix, err)
 		return nil
 	}
 

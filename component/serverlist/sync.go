@@ -18,6 +18,7 @@
 package serverlist
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,14 +40,16 @@ const (
 )
 
 // InitSyncServerIPList 初始化同步服务器信息列表
-func InitSyncServerIPList(appConfig func() config.AppConfig) error {
-	// 先同步执行一次，后续定时异步执行
-	if _, err := SyncServerIPList(appConfig); err != nil {
+func InitSyncServerIPList(ctx context.Context, appConfig func() config.AppConfig) error {
+	// sync ip list once at first
+	if _, err := SyncServerIPList(ctx, appConfig); err != nil {
 		return err
 	}
-	if err := CheckSecretOK(appConfig); err != nil {
+	// check if the secret is valid
+	if err := CheckSecretOK(ctx, appConfig); err != nil {
 		return err
 	}
+	// start scheduled tasks to async update ip list
 	go component.StartRefreshConfig(&SyncServerIPListComponent{
 		appConfig: appConfig,
 		stopCh:    make(chan struct{}),
@@ -72,7 +75,7 @@ loop:
 	for {
 		select {
 		case <-t2.C:
-			if _, err := SyncServerIPList(s.appConfig); err != nil {
+			if _, err := SyncServerIPList(context.Background(), s.appConfig); err != nil {
 				log.Errorf("同步Apollo服务信息失败. err: %+v", err)
 			}
 			t2.Reset(refreshIPListInterval)
@@ -90,7 +93,7 @@ func (s *SyncServerIPListComponent) Stop() {
 }
 
 // SyncServerIPList 同步apollo服务信息
-func SyncServerIPList(appConfigFunc func() config.AppConfig) (map[string]*config.ServerInfo, error) {
+func SyncServerIPList(ctx context.Context, appConfigFunc func() config.AppConfig) (map[string]*config.ServerInfo, error) {
 	if appConfigFunc == nil {
 		return nil, fmt.Errorf("can not find apollo config! please confirm")
 	}
@@ -107,12 +110,12 @@ func SyncServerIPList(appConfigFunc func() config.AppConfig) (map[string]*config
 		}
 		c.Timeout = duration
 	}
-	serverMap, err := http.Request(appConfig.GetServicesConfigURL(), c, &http.CallBack{
+	serverMap, err := http.Request(ctx, appConfig.GetServicesConfigURL(), c, &http.CallBack{
 		SuccessCallBack: SyncServerIPListSuccessCallBack,
 		AppConfigFunc:   appConfigFunc,
 	})
 	if err != nil {
-		if errors.Is(err, perror.ErrOverMaxRetryStill) {
+		if errors.Is(err, perror.ErrOverMaxRetryTimes) {
 			return nil, fmt.Errorf("获取Apollo服务列表失败")
 		}
 		return nil, err

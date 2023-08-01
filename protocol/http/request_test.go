@@ -18,12 +18,12 @@
 package http
 
 import (
+	"context"
+	json2 "encoding/json"
 	"fmt"
 	"net/url"
 	"testing"
 	"time"
-
-	json2 "encoding/json"
 
 	"github.com/apolloconfig/agollo/v4/cluster/roundrobin"
 	"github.com/apolloconfig/agollo/v4/component/log"
@@ -70,7 +70,7 @@ func TestHttpsRequestRecovery(t *testing.T) {
 	})
 	urlSuffix := getConfigURLSuffix(appConfig, appConfig.NamespaceName)
 
-	o, err := RequestRecovery(*appConfig, &env.ConnectConfig{
+	o, err := RequestRecovery(context.Background(), *appConfig, &env.ConnectConfig{
 		URI:     urlSuffix,
 		IsRetry: true,
 	}, &CallBack{
@@ -92,7 +92,7 @@ func TestRequestRecovery(t *testing.T) {
 	})
 	urlSuffix := getConfigURLSuffix(appConfig, appConfig.NamespaceName)
 
-	o, err := RequestRecovery(*appConfig, &env.ConnectConfig{
+	o, err := RequestRecovery(context.Background(), *appConfig, &env.ConnectConfig{
 		URI:     urlSuffix,
 		IsRetry: true,
 	}, &CallBack{
@@ -115,7 +115,7 @@ func TestCustomTimeout(t *testing.T) {
 	})
 	urlSuffix := getConfigURLSuffix(appConfig, appConfig.NamespaceName)
 
-	o, err := RequestRecovery(*appConfig, &env.ConnectConfig{
+	o, err := RequestRecovery(context.Background(), *appConfig, &env.ConnectConfig{
 		URI:     urlSuffix,
 		Timeout: 11 * time.Second,
 	}, &CallBack{

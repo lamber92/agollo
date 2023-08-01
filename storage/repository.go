@@ -46,7 +46,8 @@ const (
 type Cache struct {
 	apolloConfigCache *sync.Map
 	changeListeners   *list.List
-	rw                sync.RWMutex
+	rw                sync.RWMutex // listener locker
+	updateCacheLock   sync.Mutex   // update cache data locker
 }
 
 // GetConfig 根据namespace获取apollo配置
@@ -457,11 +458,22 @@ func (c *Cache) UpdateApolloConfig(apolloConfig *config.ApolloConfig, appConfigF
 		return
 	}
 
+	// Prevent update conflicts triggered by query triggering new namespace configuration and
+	// corresponding namespace configuration update push at the same time.
+	// However, because the active query action requests the apollo cache interface,
+	// it is still impossible to completely avoid configuration
+	// conflicts (the new configuration is overwritten by the old configuration),
+	// so it is strongly recommended to initialize all the namespaces to be obtained during initialization.
+	c.updateCacheLock.Lock()
+	defer c.updateCacheLock.Unlock()
+
 	appConfig := appConfigFunc()
 	// update apollo connection config
 	appConfig.SetCurrentApolloConfig(&apolloConfig.ApolloConnConfig)
 
 	// get change list
+	// Note that for scenarios using the default cache component,
+	// this `configCacheExpireTime` is invalid, and the cache has no expiration time.
 	changeList := c.UpdateApolloConfigCache(apolloConfig.Configurations, configCacheExpireTime, apolloConfig.NamespaceName)
 
 	notify := appConfig.GetNotificationsMap().GetNotify(apolloConfig.NamespaceName)

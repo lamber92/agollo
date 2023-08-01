@@ -1,19 +1,21 @@
 package serverlist
 
 import (
+	"context"
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/apolloconfig/agollo/v4/env"
 	"github.com/apolloconfig/agollo/v4/env/config"
 	"github.com/apolloconfig/agollo/v4/perror"
 	"github.com/apolloconfig/agollo/v4/protocol/http"
-	"strconv"
-	"time"
 )
 
 // CheckSecretOK 检查秘钥是否正确
-func CheckSecretOK(appConfigFunc func() config.AppConfig) (err error) {
+func CheckSecretOK(ctx context.Context, appConfigFunc func() config.AppConfig) (err error) {
 	if appConfigFunc == nil {
-		return fmt.Errorf("没有找到Apollo配置，请确认！")
+		return fmt.Errorf("AppConfig is not found, please check")
 	}
 
 	appConfig := appConfigFunc()
@@ -28,12 +30,12 @@ func CheckSecretOK(appConfigFunc func() config.AppConfig) (err error) {
 		}
 		c.Timeout = duration
 	}
-	if _, err = http.Request(appConfig.GetCheckSecretURL(), c, nil); err != nil {
+	if _, err = http.Request(ctx, appConfig.GetCheckSecretURL(), c, nil); err != nil {
 		switch err {
-		case perror.ErrOverMaxRetryStill:
-			return fmt.Errorf("检查Apollo秘钥正确性失败. err: %v", err)
+		case perror.ErrOverMaxRetryTimes:
+			return fmt.Errorf("failed to check Apollo-Secret. err: %v", err)
 		case perror.ErrUnauthorized:
-			return fmt.Errorf("Apollo-Secret不正确. AppID: %s, Cluster: %s", appConfig.AppID, appConfig.Cluster)
+			return fmt.Errorf("invalid Apollo-Secret, please check. AppID: %s, Cluster: %s", appConfig.AppID, appConfig.Cluster)
 		default:
 			return
 		}

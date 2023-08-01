@@ -176,6 +176,12 @@ func (n *notificationsMap) UpdateNotify(namespaceName string, notificationID int
 	}
 }
 
+func (n *notificationsMap) AddNamespace(namespaceName string) {
+	if len(namespaceName) > 0 {
+		n.setNotify(namespaceName, defaultNotificationID)
+	}
+}
+
 func (n *notificationsMap) setNotify(namespaceName string, notificationID int64) {
 	n.notifications.Store(namespaceName, notificationID)
 }
@@ -217,7 +223,6 @@ func (n *notificationsMap) GetNotifies(namespace string) string {
 		})
 	} else {
 		notify, _ := n.notifications.LoadOrStore(namespace, defaultNotificationID)
-
 		notificationArr = append(notificationArr,
 			&Notification{
 				NamespaceName:  namespace,
@@ -226,7 +231,6 @@ func (n *notificationsMap) GetNotifies(namespace string) string {
 	}
 
 	j, err := json.Marshal(notificationArr)
-
 	if err != nil {
 		return ""
 	}

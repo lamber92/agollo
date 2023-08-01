@@ -18,6 +18,7 @@
 package remote
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -98,7 +99,7 @@ func TestAutoSyncConfigServices(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	apolloConfigs := syncApollo.Sync(func() config.AppConfig {
+	apolloConfigs := syncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *newAppConfig
 	})
 
@@ -126,13 +127,13 @@ func TestAutoSyncConfigServicesNoBackupFile(t *testing.T) {
 
 	server.SetNextTryConnTime(appConfig.GetHost(), 0)
 	newAppConfig.IsBackupConfig = false
-	syncApollo.Sync(func() config.AppConfig {
+	syncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *newAppConfig
 	})
 
 	server.SetNextTryConnTime(appConfig.GetHost(), 0)
 	newAppConfig.IsBackupConfig = true
-	configs := syncApollo.Sync(func() config.AppConfig {
+	configs := syncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *newAppConfig
 	})
 
@@ -159,7 +160,7 @@ func TestAutoSyncConfigServicesError(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	apolloConfigs := syncApollo.Sync(func() config.AppConfig {
+	apolloConfigs := syncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *newAppConfig
 	})
 
@@ -172,7 +173,7 @@ func TestClientLabelConfigService(t *testing.T) {
 	newAppConfig.IP = server.URL
 	newAppConfig.Label = grayLabel
 
-	apolloConfigs := syncApollo.Sync(func() config.AppConfig {
+	apolloConfigs := syncApollo.Sync(context.Background(), func() config.AppConfig {
 		return *newAppConfig
 	})
 

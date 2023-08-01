@@ -18,11 +18,11 @@
 package memory
 
 import (
-	"errors"
 	"sync"
 	"sync/atomic"
 
 	"github.com/apolloconfig/agollo/v4/agcache"
+	"github.com/apolloconfig/agollo/v4/perror"
 )
 
 // DefaultCache 默认缓存
@@ -48,7 +48,7 @@ func (d *DefaultCache) EntryCount() (entryCount int64) {
 func (d *DefaultCache) Get(key string) (value interface{}, err error) {
 	v, ok := d.defaultCache.Load(key)
 	if !ok {
-		return nil, errors.New("load default cache fail")
+		return nil, perror.ErrNotFound
 	}
 	return v, nil
 }
